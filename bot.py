@@ -3,54 +3,66 @@ import requests
 from dotenv import load_dotenv
 from datetime import datetime
 
+# Загружаем переменные из .env
 load_dotenv()
 
-# Для отладки: покажем, что Python видит ваш ключ
+# Получаем API-ключ из переменных окружения
 api_key = os.getenv("OPENROUTER_API_KEY")
-print("API KEY:", api_key)
+print("API KEY:", api_key)  # Для проверки, что ключ подхватился
 
+# Ссылка для запросов к OpenRouter
 url = "https://openrouter.ai/api/v1/chat/completions"
 
+# Заголовки для запроса
 headers = {
     "Authorization": f"Bearer {api_key}",
     "Content-Type": "application/json"
 }
 
-def get_current_time() -> dict:
-    """Return the current UTC time in ISO‑8601 format."""
-    current_time = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
-    return {"utc": current_time}
+# Функция, чтобы узнать текущее время в UTC
+def get_current_time():
+    now = datetime.utcnow()
+    # Форматируем время как строку
+    return {"utc": now.replace(microsecond=0).isoformat() + "Z"}
 
-def is_time_question(question: str) -> bool:
-    # Простая проверка на вопрос о времени (можно доработать)
-    time_phrases = [
-        "what time is it", "current time", "now time", "сколько времени", "который час", "время сейчас"
+# Проверяем, спрашивает ли пользователь про время
+def is_time_question(text):
+    text = text.lower()
+    # Список фраз, по которым определяем вопрос о времени
+    time_words = [
+        "what time is it", "current time", "now time",
+        "сколько времени", "который час", "время сейчас"
     ]
-    q = question.lower()
-    return any(phrase in q for phrase in time_phrases)
+    for word in time_words:
+        if word in text:
+            return True
+    return False
 
-def ask_openrouter(question: str):
+# Функция для общения с OpenRouter
+def ask_openrouter(text):
     data = {
-        "model": "mistralai/devstral-small:free",  # <-- правильный ID модели!
+        "model": "mistralai/devstral-small:free",  # Бесплатная модель
         "messages": [
-            {"role": "user", "content": question}
+            {"role": "user", "content": text}
         ]
     }
+    # Отправляем запрос
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 200:
-        result = response.json()
-        # Извлекаем текст ответа
         try:
-            return result["choices"][0]["message"]["content"]
-        except Exception:
-            return result
+            # Пытаемся достать ответ из JSON
+            return response.json()["choices"][0]["message"]["content"]
+        except Exception as e:
+            return "Не удалось получить ответ от модели."
     else:
         return f"Ошибка: {response.status_code}\n{response.text}"
 
 if __name__ == "__main__":
-    question = input("Введите ваш вопрос: ")
-    if is_time_question(question):
+    # Спрашиваем пользователя, что он хочет узнать
+    user_input = input("Введите ваш вопрос: ")
+    if is_time_question(user_input):
+        # Если вопрос про время — отвечаем сами
         print("Ответ:", get_current_time())
     else:
-        answer = ask_openrouter(question)
-        print("Ответ:", answer)
+        # Иначе спрашиваем у OpenRouter
+        print("Ответ:", ask_openrouter(user_input))
